@@ -22,6 +22,17 @@ vec2 = pygame.math.Vector2
 a line which the car object cannot touch
 """
 
+tf.compat.v1.disable_eager_execution()
+
+# Real main redirects to this
+
+
+def main():
+    window = MyWindow(displayWidth, displayHeight,
+                      "Maxine Learning", resizable=False)
+    pyglet.clock.schedule_interval(window.update, 1 / frameRate)
+    pyglet.app.run()
+
 
 class QLearning:
     def __init__(self, game):
@@ -52,12 +63,14 @@ class QLearning:
         self.maxTau = 10000
         self.tau = 0
         # reset the graph i guess, I don't know why therefore is already a graph happening but who cares
-        tf.reset_default_graph()
+        tf.compat.v1.reset_default_graph()
 
-        self.sess = tf.Session()
+        self.sess = tf.compat.v1.Session()
 
-        self.DQNetwork = DQN(self.stateSize, self.actionSize, self.learningRate, name='DQNetwork')
-        self.TargetNetwork = DQN(self.stateSize, self.actionSize, self.learningRate, name='TargetNetwork')
+        self.DQNetwork = DQN(self.stateSize, self.actionSize,
+                             self.learningRate, name='DQNetwork')
+        self.TargetNetwork = DQN(
+            self.stateSize, self.actionSize, self.learningRate, name='TargetNetwork')
 
         self.memoryBuffer = PrioritisedMemory(self.memorySize)
         self.pretrain()
@@ -68,15 +81,16 @@ class QLearning:
         self.newEpisode = False
         self.stepNo = 0
         self.episodeNo = 0
-        self.saver = tf.train.Saver()
+        self.saver = tf.compat.v1.train.Saver()
 
         load = False
         loadFromEpisodeNo = 6300
         if load:
             self.episodeNo = loadFromEpisodeNo
-            self.saver.restore(self.sess, "./allModels/model{}/models/model.ckpt".format(self.episodeNo))
+            self.saver.restore(
+                self.sess, "./allModels/model{}/models/model.ckpt".format(self.episodeNo))
         else:
-            self.sess.run(tf.global_variables_initializer())
+            self.sess.run(tf.compat.v1.global_variables_initializer())
         # self.sess.graph.finalize()
         self.sess.run(self.update_target_graph())
 
@@ -86,10 +100,12 @@ class QLearning:
     def update_target_graph(self):
 
         # Get the parameters of our DQNNetwork
-        from_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "DQNetwork")
+        from_vars = tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, "DQNetwork")
 
         # Get the parameters of our Target_network
-        to_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "TargetNetwork")
+        to_vars = tf.compat.v1.get_collection(
+            tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, "TargetNetwork")
 
         op_holder = []
 
@@ -115,12 +131,14 @@ class QLearning:
 
             if self.game.is_episode_finished():
                 reward = -100
-                self.memoryBuffer.store((state, action, reward, nextState, True))
+                self.memoryBuffer.store(
+                    (state, action, reward, nextState, True))
                 self.game.new_episode()
                 state = self.game.get_state()
                 self.newEpisode = True
             else:
-                self.memoryBuffer.store((state, action, reward, nextState, False))
+                self.memoryBuffer.store(
+                    (state, action, reward, nextState, False))
                 state = nextState
 
         print("pretrainingDone")
@@ -172,13 +190,15 @@ class QLearning:
             #       .format(self.episodeNo, self.stepNo, actionNo, reward, epsilon, self.trainingStepNo))
 
             # add the experience to the memory buffer
-            self.memoryBuffer.store((self.state, action, reward, nextState, self.game.is_episode_finished()))
+            self.memoryBuffer.store(
+                (self.state, action, reward, nextState, self.game.is_episode_finished()))
 
             self.state = nextState
 
             # learning part
             # first we are gonna need to grab a random batch of experiences from out memory
-            treeIndexes, batch, ISWeights = self.memoryBuffer.sample(self.batchSize)
+            treeIndexes, batch, ISWeights = self.memoryBuffer.sample(
+                self.batchSize)
 
             statesFromBatch = np.array([exp[0][0] for exp in batch])
             actionsFromBatch = np.array([exp[0][1] for exp in batch])
@@ -199,13 +219,15 @@ class QLearning:
                     targetQsFromBatch.append(rewardsFromBatch[i])
                 else:
                     # target = rewardsFromBatch[i] + self.gamma * np.max(QValueOfNextStates[i])
-                    target = rewardsFromBatch[i] + self.gamma * QValueOfNextStates[i][action]  # double DQN
+                    target = rewardsFromBatch[i] + self.gamma * \
+                        QValueOfNextStates[i][action]  # double DQN
                     targetQsFromBatch.append(target)
 
             targetsForBatch = np.array([t for t in targetQsFromBatch])
 
             loss, _, absoluteErrors = self.sess.run(
-                [self.DQNetwork.loss, self.DQNetwork.optimizer, self.DQNetwork.absoluteError],
+                [self.DQNetwork.loss, self.DQNetwork.optimizer,
+                    self.DQNetwork.absoluteError],
                 feed_dict={self.DQNetwork.inputs_: statesFromBatch,
                            self.DQNetwork.actions_: actionsFromBatch,
                            self.DQNetwork.targetQ: targetsForBatch,
@@ -272,46 +294,57 @@ class DQN:
         self.learningRate = learningRate
         self.name = name
 
-        with tf.variable_scope(self.name):
+        with tf.compat.v1.variable_scope(self.name):
             # the inputs describing the state
-            self.inputs_ = tf.placeholder(tf.float32, [None, *self.stateSize], name="inputs")
+            self.inputs_ = tf.compat.v1.placeholder(
+                tf.float32, [None, *self.stateSize], name="inputs")
 
             # the one hotted action that we took
             # e.g. if we took the 3rd action action_ = [0,0,1,0,0,0,0]
-            self.actions_ = tf.placeholder(tf.float32, [None, self.actionSize], name="actions")
+            self.actions_ = tf.compat.v1.placeholder(
+                tf.float32, [None, self.actionSize], name="actions")
 
             # the target = reward + the discounted maximum possible q value of hte next state
-            self.targetQ = tf.placeholder(tf.float32, [None], name="target")
+            self.targetQ = tf.compat.v1.placeholder(
+                tf.float32, [None], name="target")
 
-            self.ISWeights_ = tf.placeholder(tf.float32, [None, 1], name='ISWeights')
+            self.ISWeights_ = tf.compat.v1.placeholder(
+                tf.float32, [None, 1], name='ISWeights')
 
-            self.dense1 = tf.layers.dense(inputs=self.inputs_,
-                                          units=16,
-                                          activation=tf.nn.elu,
-                                          kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                          name="dense1")
-            self.dense2 = tf.layers.dense(inputs=self.dense1,
-                                          units=16,
-                                          activation=tf.nn.elu,
-                                          kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                          name="dense2")
-            self.output = tf.layers.dense(inputs=self.dense2,
-                                          units=self.actionSize,
-                                          kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                          activation=None,
-                                          name="outputs")
+            self.dense1 = tf.compat.v1.layers.dense(inputs=self.inputs_,
+                                                    units=16,
+                                                    activation=tf.nn.elu,
+                                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                        scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                    name="dense1")
+            self.dense2 = tf.compat.v1.layers.dense(inputs=self.dense1,
+                                                    units=16,
+                                                    activation=tf.nn.elu,
+                                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                        scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                    name="dense2")
+            self.output = tf.compat.v1.layers.dense(inputs=self.dense2,
+                                                    units=self.actionSize,
+                                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                        scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                    activation=None,
+                                                    name="outputs")
 
             # by multiplying the output by the one hotted action space we only get the q value we desire
             # all other values are 0, therefore taking the sum of these values gives us our qValue
-            self.QValue = tf.reduce_sum(tf.multiply(self.output, self.actions_))
+            self.QValue = tf.reduce_sum(
+                input_tensor=tf.multiply(self.output, self.actions_))
 
-            self.absoluteError = abs(self.QValue - self.targetQ)  # used for prioritising experiences
+            # used for prioritising experiences
+            self.absoluteError = abs(self.QValue - self.targetQ)
 
             # calculate the loss by using mean squared error
-            self.loss = tf.reduce_mean(self.ISWeights_ * tf.square(self.targetQ - self.QValue))
+            self.loss = tf.reduce_mean(
+                input_tensor=self.ISWeights_ * tf.square(self.targetQ - self.QValue))
 
             # use adam optimiser (its good shit)
-            self.optimizer = tf.train.AdamOptimizer(self.learningRate).minimize(self.loss)
+            self.optimizer = tf.compat.v1.train.AdamOptimizer(
+                self.learningRate).minimize(self.loss)
 
 
 class DDQN:
@@ -321,72 +354,85 @@ class DDQN:
         self.learningRate = learningRate
         self.name = name
 
-        with tf.variable_scope(self.name):
+        with tf.compat.v1.variable_scope(self.name):
             # the inputs describing the state
-            self.inputs_ = tf.placeholder(tf.float32, [None, *self.stateSize], name="inputs")
+            self.inputs_ = tf.compat.v1.placeholder(
+                tf.float32, [None, *self.stateSize], name="inputs")
 
             # the one hotted action that we took
             # e.g. if we took the 3rd action action_ = [0,0,1,0,0,0,0]
-            self.actions_ = tf.placeholder(tf.float32, [None, self.actionSize], name="actions")
+            self.actions_ = tf.compat.v1.placeholder(
+                tf.float32, [None, self.actionSize], name="actions")
 
             # the target = reward + the discounted maximum possible q value of hte next state
-            self.targetQ = tf.placeholder(tf.float32, [None], name="target")
+            self.targetQ = tf.compat.v1.placeholder(
+                tf.float32, [None], name="target")
 
-            self.ISWeights_ = tf.placeholder(tf.float32, [None, 1], name='ISWeights')
+            self.ISWeights_ = tf.compat.v1.placeholder(
+                tf.float32, [None, 1], name='ISWeights')
 
-            self.dense1 = tf.layers.dense(inputs=self.inputs_,
-                                          units=16,
-                                          activation=tf.nn.elu,
-                                          kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                          name="dense1")
+            self.dense1 = tf.compat.v1.layers.dense(inputs=self.inputs_,
+                                                    units=16,
+                                                    activation=tf.nn.elu,
+                                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                        scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                    name="dense1")
 
-            ## Here we separate into two streams
+            # Here we separate into two streams
             # The one that calculate V(s) which is the value of the input state
             # in other words how good this state is
 
-            self.valueLayer = tf.layers.dense(inputs=self.dense1,
-                                              units=16,
-                                              activation=tf.nn.elu,
-                                              kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                              name="valueLayer")
+            self.valueLayer = tf.compat.v1.layers.dense(inputs=self.dense1,
+                                                        units=16,
+                                                        activation=tf.nn.elu,
+                                                        kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                            scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                        name="valueLayer")
 
-            self.value = tf.layers.dense(inputs=self.valueLayer,
-                                         units=1,
-                                         activation=None,
-                                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                         name="value")
+            self.value = tf.compat.v1.layers.dense(inputs=self.valueLayer,
+                                                   units=1,
+                                                   activation=None,
+                                                   kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                       scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                   name="value")
 
             # The one that calculate A(s,a)
             # which is the advantage of taking each action in this given state
-            self.advantageLayer = tf.layers.dense(inputs=self.dense1,
-                                                  units=16,
-                                                  activation=tf.nn.elu,
-                                                  kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                                  name="advantageLayer")
+            self.advantageLayer = tf.compat.v1.layers.dense(inputs=self.dense1,
+                                                            units=16,
+                                                            activation=tf.nn.elu,
+                                                            kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                                scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                            name="advantageLayer")
 
-            self.advantage = tf.layers.dense(inputs=self.advantageLayer,
-                                             units=self.actionSize,
-                                             activation=None,
-                                             kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                             name="advantages")
+            self.advantage = tf.compat.v1.layers.dense(inputs=self.advantageLayer,
+                                                       units=self.actionSize,
+                                                       activation=None,
+                                                       kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
+                                                           scale=1.0, mode="fan_avg", distribution="uniform"),
+                                                       name="advantages")
 
             # Aggregating layer
             # Q(s,a) = V(s) + (A(s,a) - 1/|A| * sum A(s,a'))
             # output  = value of the state + the advantage of taking the given action relative to other actions
             self.output = self.value + tf.subtract(self.advantage,
-                                                   tf.reduce_mean(self.advantage, axis=1, keepdims=True))
+                                                   tf.reduce_mean(input_tensor=self.advantage, axis=1, keepdims=True))
 
             # by multiplying the output by the one hotted action space we only get the q value we desire
             # all other values are 0, therefore taking the sum of these values gives us our qValue
-            self.QValue = tf.reduce_sum(tf.multiply(self.output, self.actions_))
+            self.QValue = tf.reduce_sum(
+                input_tensor=tf.multiply(self.output, self.actions_))
 
-            self.absoluteError = abs(self.QValue - self.targetQ)  # used for prioritising experiences
+            # used for prioritising experiences
+            self.absoluteError = abs(self.QValue - self.targetQ)
 
             # calculate the loss by using mean squared error
-            self.loss = tf.reduce_mean(self.ISWeights_ * tf.square(self.targetQ - self.QValue))
+            self.loss = tf.reduce_mean(
+                input_tensor=self.ISWeights_ * tf.square(self.targetQ - self.QValue))
 
             # use adam optimiser (its good shit)
-            self.optimizer = tf.train.AdamOptimizer(self.learningRate).minimize(self.loss)
+            self.optimizer = tf.compat.v1.train.AdamOptimizer(
+                self.learningRate).minimize(self.loss)
 
 
 class PrioritisedMemory:
@@ -432,7 +478,8 @@ class PrioritisedMemory:
         # we are going to need to get the maximum weight and divide all weights by that
 
         # the largest weight will have the lowest priority and thus the lowest probability of being chosen
-        minPriority = np.min(np.maximum(self.sumTree.tree[self.sumTree.indexOfFirstData:], self.e))
+        minPriority = np.min(np.maximum(
+            self.sumTree.tree[self.sumTree.indexOfFirstData:], self.e))
         minProbability = minPriority / self.sumTree.total_priority()
 
         # formula
@@ -450,7 +497,8 @@ class PrioritisedMemory:
 
             #  IS = (1/N * 1/P(i))**b /max wi == (N*P(i))**-b  /max wi
 
-            batchISWeights[i, 0] = np.power(n * samplingProbability, -self.b) / maxWeight
+            batchISWeights[i, 0] = np.power(
+                n * samplingProbability, -self.b) / maxWeight
 
             batchIndexes[i] = treeIndex
             experience = [data]
@@ -658,6 +706,4 @@ class MyWindow(pyglet.window.Window):
 
 
 if __name__ == "__main__":
-    window = MyWindow(displayWidth, displayHeight, "AI Learns to Drive", resizable=False)
-    pyglet.clock.schedule_interval(window.update, 1 / frameRate)
-    pyglet.app.run()
+    main()
